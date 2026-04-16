@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mr. Puffs - Spin & Win!</title>
+    <style>
+        :root { --primary: #ff6600; --dark: #111111; --white: #ffffff; }
+        body { background-color: var(--dark); color: var(--white); font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; text-align: center; min-height: 100vh; }
+        h1 { color: var(--primary); font-size: 2rem; margin-bottom: 10px; }
+        p { margin-bottom: 20px; color: #ccc; }
+        .form-section, .wheel-section { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--primary); padding: 20px; border-radius: 15px; width: 100%; max-width: 400px; margin-bottom: 20px; }
+        .custom-form { display: flex; flex-direction: column; gap: 15px; }
+        .custom-form input { padding: 15px; background: rgba(0,0,0,0.5); border: 1px solid var(--primary); color: white; border-radius: 8px; font-size: 1rem; }
+        .custom-form button { background: var(--primary); color: white; border: none; padding: 15px; font-size: 1.2rem; font-weight: bold; border-radius: 8px; cursor: pointer; text-transform: uppercase; }
+        .custom-form button:disabled { background: #555; cursor: not-allowed; }
+        
+        /* WHEEL ANIMATION SET TO 9 SECONDS */
+        .wheel-container { position: relative; width: 300px; height: 300px; margin: 20px auto; display: none; }
+        canvas { 
+            width: 100%; height: 100%; border-radius: 50%; border: 4px solid var(--white); 
+            box-shadow: 0 0 25px var(--primary); 
+            transition: transform 9s cubic-bezier(0.15, 0, 0.15, 1); /* 9 Second Smooth Stop */
+        }
+        .pointer { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 30px solid white; z-index: 10; }
+        .result-text { font-size: 1.5rem; margin-top: 20px; color: var(--primary); font-weight: bold; min-height: 30px; }
+    </style>
+</head>
+<body>
+    <img src="https://mrpuffs.com/wp-content/uploads/2021/04/MrPuffs-Logo-White.png" alt="Mr Puffs" style="width: 150px; margin-bottom: 20px;">
+    
+    <div class="form-section" id="formContainer">
+        <h1>VIP Sign Up</h1>
+        <p>Fill out the form to unlock the Spin Wheel!</p>
+        <form id="vipForm" class="custom-form">
+            <input type="text" name="name" placeholder="Full Name" required>
+            <input type="tel" name="phone" placeholder="Phone Number" required>
+            <input type="email" name="email" placeholder="Email Address" required>
+            <button type="submit" id="submitBtn">Submit & Spin</button>
+        </form>
+    </div>
+
+    <div class="wheel-section" id="wheelContainer" style="display:none;">
+        <h1 id="statusTitle">Good Luck!</h1>
+        <div class="wheel-container" id="theWheelBox">
+            <div class="pointer"></div>
+            <canvas id="wheelCanvas" width="300" height="300"></canvas>
+        </div>
+        <div class="result-text" id="resultText"></div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("wheelCanvas");
+        const ctx = canvas.getContext("2d");
+        const scriptURL = 'https://script.google.com/macros/s/AKfycbx6UVdLdnOEYgi_Eb0C8u4ZxCgQ2HkWlLwOxNiIXMvxxfnp8V75OHsT2oxBUQh7OiBl/exec';
+        
+        const prizes = [
+            { text: "3% Off", weight: 30, color: "#ff6600" },
+            { text: "5% Off", weight: 30, color: "#1a1a1a" },
+            { text: "Free Ice Cream", weight: 20, color: "#ff8533" },
+            { text: "Free Trial Puff", weight: 10, color: "#333333" },
+            { text: "10% Off", weight: 5, color: "#e65c00" },
+            { text: "Free 6 on 30", weight: 5, color: "#000000" }
+        ];
+
+        function drawWheel() {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = centerX;
+            const sliceAngle = (2 * Math.PI) / prizes.length;
+            for (let i = 0; i < prizes.length; i++) {
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, i * sliceAngle, (i + 1) * sliceAngle);
+                ctx.fillStyle = prizes[i].color; ctx.fill(); ctx.strokeStyle = "#fff"; ctx.stroke();
+                ctx.save(); ctx.translate(centerX, centerY);
+                ctx.rotate(i * sliceAngle + sliceAngle / 2);
+                ctx.textAlign = "right"; ctx.fillStyle = "#ffffff";
+                ctx.font = "bold 16px sans-serif"; ctx.fillText(prizes[i].text, radius - 15, 6);
+                ctx.restore();
+            }
+        }
+        drawWheel();
+
+        document.getElementById('vipForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.innerText = "Sending...";
+
+            // Send to Google Sheets
+            fetch(scriptURL, { 
+                method: 'POST', 
+                body: new FormData(this), 
+                mode: 'no-cors' 
+            })
+            .then(() => {
+                // Transition to Wheel
+                document.getElementById('formContainer').style.display = 'none';
+                document.getElementById('wheelContainer').style.display = 'block';
+                document.getElementById('theWheelBox').style.display = 'block';
+                
+                // Small delay to let the UI render before spinning
+                setTimeout(startSpin, 500);
+            })
+            .catch(() => {
+                alert("Submission failed. Check internet connection.");
+                btn.disabled = false;
+            });
+        });
+
+        let currentRotation = 0;
+        function startSpin() {
+            const resultText = document.getElementById('resultText');
+            resultText.innerText = "Spinning...";
+
+            const randomNum = Math.floor(Math.random() * 100);
+            let weightSum = 0, winningIndex = 0;
+            for (let i = 0; i < prizes.length; i++) {
+                weightSum += prizes[i].weight;
+                if (randomNum < weightSum) { winningIndex = i; break; }
+            }
+
+            const sliceDeg = 360 / prizes.length;
+            // Calculate stop angle (270 is top)
+            const stopAngle = (270 - (winningIndex * sliceDeg) - (sliceDeg / 2));
+            // Rotate 10 full times + the target slice
+            const totalRotation = currentRotation + (360 * 10) + stopAngle;
+            currentRotation = totalRotation;
+
+            canvas.style.transform = `rotate(${totalRotation}deg)`;
+
+            // Show result after 9 seconds (matching the CSS transition)
+            setTimeout(() => {
+                document.getElementById('statusTitle').innerText = "Winner!";
+                resultText.innerHTML = `🎉 YOU WON:<br><span style="color:#ff6600; font-size: 2.2rem;">${prizes[winningIndex].text}</span> 🎉<br><br>Show this to the cashier!`;
+            }, 9000);
+        }
+    </script>
+</body>
+</html>
