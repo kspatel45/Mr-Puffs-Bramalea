@@ -13,17 +13,16 @@
         .custom-form { display: flex; flex-direction: column; gap: 15px; }
         .custom-form input { padding: 15px; background: rgba(0,0,0,0.5); border: 1px solid var(--primary); color: white; border-radius: 8px; font-size: 1rem; }
         .custom-form button { background: var(--primary); color: white; border: none; padding: 15px; font-size: 1.2rem; font-weight: bold; border-radius: 8px; cursor: pointer; text-transform: uppercase; }
-        .custom-form button:disabled { background: #555; cursor: not-allowed; }
         
-        /* WHEEL ANIMATION SET TO 9 SECONDS */
         .wheel-container { position: relative; width: 300px; height: 300px; margin: 20px auto; display: none; }
         canvas { 
             width: 100%; height: 100%; border-radius: 50%; border: 4px solid var(--white); 
             box-shadow: 0 0 25px var(--primary); 
-            transition: transform 9s cubic-bezier(0.15, 0, 0.15, 1); /* 9 Second Smooth Stop */
+            transition: transform 9s cubic-bezier(0.1, 0, 0.1, 1); 
         }
         .pointer { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 30px solid white; z-index: 10; }
         .result-text { font-size: 1.5rem; margin-top: 20px; color: var(--primary); font-weight: bold; min-height: 30px; }
+        #saveStatus { color: #888; font-size: 0.9rem; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -36,7 +35,8 @@
             <input type="text" name="name" placeholder="Full Name" required>
             <input type="tel" name="phone" placeholder="Phone Number" required>
             <input type="email" name="email" placeholder="Email Address" required>
-            <button type="submit" id="submitBtn">Submit & Spin</button>
+            <input type="hidden" name="offer" id="offerInput">
+            <button type="submit">Unlock Spin Wheel</button>
         </form>
     </div>
 
@@ -47,12 +47,13 @@
             <canvas id="wheelCanvas" width="300" height="300"></canvas>
         </div>
         <div class="result-text" id="resultText"></div>
+        <div id="saveStatus"></div>
     </div>
 
     <script>
         const canvas = document.getElementById("wheelCanvas");
         const ctx = canvas.getContext("2d");
-        const scriptURL = 'https://script.google.com/macros/s/AKfycbx6UVdLdnOEYgi_Eb0C8u4ZxCgQ2HkWlLwOxNiIXMvxxfnp8V75OHsT2oxBUQh7OiBl/exec';
+        const scriptURL = 'https://script.google.com/macros/s/AKfycbxEcJC8FaOzg0mGLcIUMiE3ee-AGgj9tES2gPmMxYOuINtYm-WNwSqKmZ6SurgFX0Yl/exec';
         
         const prizes = [
             { text: "3% Off", weight: 30, color: "#ff6600" },
@@ -69,44 +70,23 @@
             const radius = centerX;
             const sliceAngle = (2 * Math.PI) / prizes.length;
             for (let i = 0; i < prizes.length; i++) {
-                ctx.beginPath();
-                ctx.moveTo(centerX, centerY);
+                ctx.beginPath(); ctx.moveTo(centerX, centerY);
                 ctx.arc(centerX, centerY, radius, i * sliceAngle, (i + 1) * sliceAngle);
                 ctx.fillStyle = prizes[i].color; ctx.fill(); ctx.strokeStyle = "#fff"; ctx.stroke();
-                ctx.save(); ctx.translate(centerX, centerY);
-                ctx.rotate(i * sliceAngle + sliceAngle / 2);
-                ctx.textAlign = "right"; ctx.fillStyle = "#ffffff";
-                ctx.font = "bold 16px sans-serif"; ctx.fillText(prizes[i].text, radius - 15, 6);
-                ctx.restore();
+                ctx.save(); ctx.translate(centerX, centerY); ctx.rotate(i * sliceAngle + sliceAngle / 2);
+                ctx.textAlign = "right"; ctx.fillStyle = "#ffffff"; ctx.font = "bold 16px sans-serif";
+                ctx.fillText(prizes[i].text, radius - 15, 6); ctx.restore();
             }
         }
         drawWheel();
 
+        // When form is submitted, show the wheel and start the process
         document.getElementById('vipForm').addEventListener('submit', function(e) {
             e.preventDefault();
-            const btn = document.getElementById('submitBtn');
-            btn.disabled = true;
-            btn.innerText = "Sending...";
-
-            // Send to Google Sheets
-            fetch(scriptURL, { 
-                method: 'POST', 
-                body: new FormData(this), 
-                mode: 'no-cors' 
-            })
-            .then(() => {
-                // Transition to Wheel
-                document.getElementById('formContainer').style.display = 'none';
-                document.getElementById('wheelContainer').style.display = 'block';
-                document.getElementById('theWheelBox').style.display = 'block';
-                
-                // Small delay to let the UI render before spinning
-                setTimeout(startSpin, 500);
-            })
-            .catch(() => {
-                alert("Submission failed. Check internet connection.");
-                btn.disabled = false;
-            });
+            document.getElementById('formContainer').style.display = 'none';
+            document.getElementById('wheelContainer').style.display = 'block';
+            document.getElementById('theWheelBox').style.display = 'block';
+            setTimeout(startSpin, 500);
         });
 
         let currentRotation = 0;
@@ -114,6 +94,7 @@
             const resultText = document.getElementById('resultText');
             resultText.innerText = "Spinning...";
 
+            // Logic for weighted random
             const randomNum = Math.floor(Math.random() * 100);
             let weightSum = 0, winningIndex = 0;
             for (let i = 0; i < prizes.length; i++) {
@@ -121,20 +102,41 @@
                 if (randomNum < weightSum) { winningIndex = i; break; }
             }
 
+            const winningOffer = prizes[winningIndex].text;
+            // Set the hidden input value so it's ready for the form submission
+            document.getElementById('offerInput').value = winningOffer;
+
             const sliceDeg = 360 / prizes.length;
-            // Calculate stop angle (270 is top)
             const stopAngle = (270 - (winningIndex * sliceDeg) - (sliceDeg / 2));
-            // Rotate 10 full times + the target slice
-            const totalRotation = currentRotation + (360 * 10) + stopAngle;
+            const totalRotation = currentRotation + (360 * 10) + stopAngle; 
             currentRotation = totalRotation;
 
             canvas.style.transform = `rotate(${totalRotation}deg)`;
 
-            // Show result after 9 seconds (matching the CSS transition)
+            // Finalizing after 9 seconds
             setTimeout(() => {
                 document.getElementById('statusTitle').innerText = "Winner!";
-                resultText.innerHTML = `🎉 YOU WON:<br><span style="color:#ff6600; font-size: 2.2rem;">${prizes[winningIndex].text}</span> 🎉<br><br>Show this to the cashier!`;
+                resultText.innerHTML = `🎉 YOU WON:<br><span style="color:#ff6600; font-size: 2.2rem;">${winningOffer}</span> 🎉<br><br>Show this to the cashier!`;
+                
+                sendDataToGoogle();
             }, 9000);
+        }
+
+        function sendDataToGoogle() {
+            document.getElementById('saveStatus').innerText = "Syncing with store system...";
+            const form = document.getElementById('vipForm');
+            
+            fetch(scriptURL, { 
+                method: 'POST', 
+                body: new FormData(form), 
+                mode: 'no-cors' 
+            })
+            .then(() => {
+                document.getElementById('saveStatus').innerText = "Success! Offer locked in.";
+            })
+            .catch(() => {
+                document.getElementById('saveStatus').innerText = "Sync Error. Please show cashier.";
+            });
         }
     </script>
 </body>
