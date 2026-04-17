@@ -13,20 +13,15 @@
         .custom-form { display: flex; flex-direction: column; gap: 15px; }
         .custom-form input { padding: 15px; background: rgba(0,0,0,0.5); border: 1px solid var(--primary); color: white; border-radius: 8px; font-size: 1rem; }
         .custom-form button { background: var(--primary); color: white; border: none; padding: 15px; font-size: 1.2rem; font-weight: bold; border-radius: 8px; cursor: pointer; text-transform: uppercase; }
-        
         .wheel-container { position: relative; width: 300px; height: 300px; margin: 20px auto; display: none; }
-        canvas { 
-            width: 100%; height: 100%; border-radius: 50%; border: 4px solid var(--white); 
-            box-shadow: 0 0 25px var(--primary); 
-            transition: transform 9s cubic-bezier(0.1, 0, 0.1, 1); 
-        }
+        canvas { width: 100%; height: 100%; border-radius: 50%; border: 4px solid var(--white); box-shadow: 0 0 25px var(--primary); transition: transform 9s cubic-bezier(0.1, 0, 0.1, 1); }
         .pointer { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 30px solid white; z-index: 10; }
         .result-text { font-size: 1.5rem; margin-top: 20px; color: var(--primary); font-weight: bold; min-height: 30px; }
         #saveStatus { color: #888; font-size: 0.9rem; margin-top: 10px; }
     </style>
 </head>
 <body>
-    <img src="https://github.com/kspatel45/Mr-Puffs-Bramalea/blob/main/MrPuffs-logo.png?raw=true" alt="Mr Puffs" style="width: 150px; margin-bottom: 20px;">
+    <img src="https://mrpuffs.com/wp-content/uploads/2021/04/MrPuffs-Logo-White.png" alt="Mr Puffs" style="width: 150px; margin-bottom: 20px;">
     
     <div class="form-section" id="formContainer">
         <h1>VIP Sign Up</h1>
@@ -53,8 +48,22 @@
     <script>
         const canvas = document.getElementById("wheelCanvas");
         const ctx = canvas.getContext("2d");
-        const scriptURL = 'https://script.google.com/macros/s/AKfycbxEcJC8FaOzg0mGLcIUMiE3ee-AGgj9tES2gPmMxYOuINtYm-WNwSqKmZ6SurgFX0Yl/exec';
-        
+        const scriptURL = 'https://script.google.com/macros/s/AKfycbyo-hqbXyld8q4MDPpc1O5wjmj5KTlrLrMqRDqn0xhUhHyzwV3NcWV3OuBgQz1mklDV/exec';
+        const homeURL = 'https://kspatel45.github.io/Mr-Puffs-Bramalea/'; // Home page URL
+
+        // --- INACTIVITY TIMER (15 Seconds) ---
+        let idleTimer;
+        function resetTimer() {
+            clearTimeout(idleTimer);
+            idleTimer = setTimeout(() => { window.location.href = homeURL; }, 15000);
+        }
+        window.onload = resetTimer;
+        window.onmousemove = resetTimer;
+        window.onmousedown = resetTimer; 
+        window.ontouchstart = resetTimer; 
+        window.onclick = resetTimer; 
+        window.onkeydown = resetTimer;
+
         const prizes = [
             { text: "3% Off", weight: 30, color: "#ff6600" },
             { text: "5% Off", weight: 30, color: "#1a1a1a" },
@@ -65,9 +74,7 @@
         ];
 
         function drawWheel() {
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-            const radius = centerX;
+            const centerX = canvas.width / 2, centerY = canvas.height / 2, radius = centerX;
             const sliceAngle = (2 * Math.PI) / prizes.length;
             for (let i = 0; i < prizes.length; i++) {
                 ctx.beginPath(); ctx.moveTo(centerX, centerY);
@@ -80,9 +87,10 @@
         }
         drawWheel();
 
-        // When form is submitted, show the wheel and start the process
         document.getElementById('vipForm').addEventListener('submit', function(e) {
             e.preventDefault();
+            // Stop inactivity timer once they start the game process
+            clearTimeout(idleTimer);
             document.getElementById('formContainer').style.display = 'none';
             document.getElementById('wheelContainer').style.display = 'block';
             document.getElementById('theWheelBox').style.display = 'block';
@@ -93,50 +101,35 @@
         function startSpin() {
             const resultText = document.getElementById('resultText');
             resultText.innerText = "Spinning...";
-
-            // Logic for weighted random
             const randomNum = Math.floor(Math.random() * 100);
             let weightSum = 0, winningIndex = 0;
             for (let i = 0; i < prizes.length; i++) {
                 weightSum += prizes[i].weight;
                 if (randomNum < weightSum) { winningIndex = i; break; }
             }
-
             const winningOffer = prizes[winningIndex].text;
-            // Set the hidden input value so it's ready for the form submission
             document.getElementById('offerInput').value = winningOffer;
-
             const sliceDeg = 360 / prizes.length;
             const stopAngle = (270 - (winningIndex * sliceDeg) - (sliceDeg / 2));
             const totalRotation = currentRotation + (360 * 10) + stopAngle; 
             currentRotation = totalRotation;
-
             canvas.style.transform = `rotate(${totalRotation}deg)`;
 
-            // Finalizing after 9 seconds
             setTimeout(() => {
                 document.getElementById('statusTitle').innerText = "Winner!";
                 resultText.innerHTML = `🎉 YOU WON:<br><span style="color:#ff6600; font-size: 2.2rem;">${winningOffer}</span> 🎉<br><br>Show this to the cashier!`;
-                
                 sendDataToGoogle();
+                
+                // --- AUTO REDIRECT AFTER 10 SECONDS OF WINNING ---
+                setTimeout(() => { window.location.href = homeURL; }, 10000);
             }, 9000);
         }
 
         function sendDataToGoogle() {
             document.getElementById('saveStatus').innerText = "Syncing with store system...";
-            const form = document.getElementById('vipForm');
-            
-            fetch(scriptURL, { 
-                method: 'POST', 
-                body: new FormData(form), 
-                mode: 'no-cors' 
-            })
-            .then(() => {
-                document.getElementById('saveStatus').innerText = "Success! Offer locked in.";
-            })
-            .catch(() => {
-                document.getElementById('saveStatus').innerText = "Sync Error. Please show cashier.";
-            });
+            fetch(scriptURL, { method: 'POST', body: new FormData(document.getElementById('vipForm')), mode: 'no-cors' })
+            .then(() => { document.getElementById('saveStatus').innerText = "Success! Offer locked in."; })
+            .catch(() => { document.getElementById('saveStatus').innerText = "Sync Error. Please show cashier."; });
         }
     </script>
 </body>
