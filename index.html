@@ -49,14 +49,20 @@
         const canvas = document.getElementById("wheelCanvas");
         const ctx = canvas.getContext("2d");
         const scriptURL = 'https://script.google.com/macros/s/AKfycbyo-hqbXyld8q4MDPpc1O5wjmj5KTlrLrMqRDqn0xhUhHyzwV3NcWV3OuBgQz1mklDV/exec';
-        const homeURL = 'https://kspatel45.github.io/Mr-Puffs-Bramalea-Kiosk/'; // Home page URL
+        
+        // --- UPDATED REDIRECT URL ---
+        const homeURL = 'https://kspatel45.github.io/Mr-Puffs-Bramalea-Kiosk/'; 
 
         // --- INACTIVITY TIMER (15 Seconds) ---
         let idleTimer;
         function resetTimer() {
             clearTimeout(idleTimer);
-            idleTimer = setTimeout(() => { window.location.href = homeURL; }, 15000);
+            idleTimer = setTimeout(() => { 
+                window.location.href = homeURL; 
+            }, 15000);
         }
+        
+        // Listen for any interaction to reset the timer
         window.onload = resetTimer;
         window.onmousemove = resetTimer;
         window.onmousedown = resetTimer; 
@@ -89,8 +95,9 @@
 
         document.getElementById('vipForm').addEventListener('submit', function(e) {
             e.preventDefault();
-            // Stop inactivity timer once they start the game process
+            // Stop inactivity timer once the process starts to avoid redirecting mid-spin
             clearTimeout(idleTimer);
+            
             document.getElementById('formContainer').style.display = 'none';
             document.getElementById('wheelContainer').style.display = 'block';
             document.getElementById('theWheelBox').style.display = 'block';
@@ -118,10 +125,13 @@
             setTimeout(() => {
                 document.getElementById('statusTitle').innerText = "Winner!";
                 resultText.innerHTML = `🎉 YOU WON:<br><span style="color:#ff6600; font-size: 2.2rem;">${winningOffer}</span> 🎉<br><br>Show this to the cashier!`;
+                
                 sendDataToGoogle();
                 
-                // --- AUTO REDIRECT AFTER 10 SECONDS OF WINNING ---
-                setTimeout(() => { window.location.href = homeURL; }, 10000);
+                // --- AUTO REDIRECT AFTER 10 SECONDS OF SHOWING RESULT ---
+                setTimeout(() => { 
+                    window.location.href = homeURL; 
+                }, 10000);
             }, 9000);
         }
 
